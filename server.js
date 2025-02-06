@@ -11,11 +11,12 @@ const staffRoutes = require("./routes/staffRoutes");
 const app = express();
 
 // Middleware
-app.use(cors());  // ✅ Fix CORS issue
+app.use(cors());
 app.use(express.json());
 
 // ✅ Root Route to Check if Backend is Running
 app.get("/", (req, res) => {
+    console.log("✅ Root route accessed");
     res.send("✅ API is running...");
 });
 

@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const axios = require("axios"); // ✅ Add missing axios import
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -21,7 +22,7 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({ name, email, phone, password: hashedPassword, role });
-
+    
     res.status(201).json({ message: "User created successfully", user: newUser });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -31,7 +32,30 @@ const register = async (req, res) => {
 // Login User
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+
+    const { email, password, recaptchaToken } = req.body;
+
+    if (!email || !password || !recaptchaToken) {
+      console.log("❌ Missing fields:", { email, password, recaptchaToken });
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Verify reCAPTCHA token
+    const recaptchaResponse = await axios.post(
+      "https://www.google.com/recaptcha/api/siteverify",
+      null,
+      {
+        params: {
+          secret: process.env.RECAPTCHA_SECRET,
+          response: recaptchaToken,
+        },
+      }
+    );
+
+
+    if (!recaptchaResponse.data.success) {
+      return res.status(400).json({ message: "reCAPTCHA verification failed" });
+    }
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid email or password" });
@@ -40,15 +64,15 @@ const login = async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Invalid email or password" });
 
     const token = generateToken(user._id, user.role);
+    res.json({ message: "Login successful", token, user });
 
-    // Exclude password before sending response
-    const { password: _, ...userWithoutPassword } = user.toObject();
-
-    res.json({ message: "Login successful", token, user: userWithoutPassword });
   } catch (error) {
+    console.error("❌ Server error:", error.message);
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
+
+
 
 // Get User Profile
 const getUserProfile = async (req, res) => {
